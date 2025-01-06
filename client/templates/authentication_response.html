@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Authentication response</title>
+</head>
+<body>
+<div>
+  <h1>Authentication response</h1>
+  <article>
+    <h2>Authentication response</h2>
+    <table>
+      <thead>
+      <tr>
+        <th>Info</th>
+        <th>Value</th>
+      </tr>
+      </thead>
+      <tbody>
+        <tr><td><b>code</b></td><td>{{ .Code }}</td></tr>
+        <tr></tr><td><b>sent state</b></td><td>{{ .SentState }}</td></tr>
+        <tr></tr><td><b>received state</b></td><td>{{ .ReceivedState }}</td></tr>
+        <tr></tr><td><b>error</b></td><td>{{ .Error }}</td></tr>
+        <tr></tr><td><b>error_description</b></td><td>{{ .ErrorDescription }}</td></tr>
+        <tr><td><b>token:</b></td><td>{{ .TokenAsString }}</td></tr>
+      </tbody>
+    </table>
+    <ul>
+      <li><b>code:</b> {{ .Code }}</li>
+      <li><b>sent state:</b> {{ .SentState }}</li>
+      <li><b>received state:</b> {{ .ReceivedState }}</li>
+      <li><b>error:</b> {{ .Error }}</li>
+      <li><b>error_description:</b> {{ .ErrorDescription }}</li>
+      <li><b>token:</b> {{ .TokenAsString }}</li>
+    </ul>
+  </article>
+</div>
+</body>
+<script type="application/javascript">
+
+  setTimeout(function(){
+    fetch('/auth/shutdown', {})
+            .then((response) => response.json())
+            .then((data) => {
+              console.log(data);
+            });
+  }, 5000);
+</script>
+</html>

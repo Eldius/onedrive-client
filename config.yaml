@@ -1,0 +1,6 @@
+---
+auth:
+  secret_id: "<secret_id>"
+log:
+  level: debug
+  format: json
