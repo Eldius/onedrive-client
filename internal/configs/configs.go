@@ -1,10 +1,13 @@
 package configs
 
-import "github.com/spf13/viper"
+import (
+	"github.com/spf13/viper"
+)
 
 var (
-	DefaultAuthScopes  = []string{"profile", "email", "openid", "offline_access", "User.Read"}
-	DefaultRedirectURL = "http://localhost:9999/authentication"
+	DefaultAuthScopes   = []string{"profile", "email", "openid", "offline_access", "User.Read", "Files.ReadWrite.AppFolder"}
+	DefaultRedirectURL  = "http://localhost:9999/authentication"
+	DefaultBaseEndpoint = "https://graph.microsoft.com/v1.0"
 )
 
 func GetSecretID() string {

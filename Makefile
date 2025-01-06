@@ -1,3 +1,3 @@
 
-auth:
-	go run ./cmd/cli/
+run:
+	go run ./cmd/testing/
