@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,12 +13,13 @@ import (
 )
 
 const (
-	graphApiEndpoint = "https://graph.microsoft.com/"
+	graphApiEndpoint = "https://graph.microsoft.com/v1.0/me/"
 )
 
 type Client interface {
 	Authenticate() (*TokenData, error)
 	AuthenticatedUser() (*CurrentUser, error)
+	GetAppDriveInfo() error
 }
 
 type client struct {
@@ -143,7 +145,7 @@ func (c *client) Authenticate() (*TokenData, error) {
 }
 
 func (c *client) AuthenticatedUser() (*CurrentUser, error) {
-	req, err := http.NewRequest(http.MethodGet, graphApiEndpoint+"/v1.0/me/", nil)
+	req, err := http.NewRequest(http.MethodGet, graphApiEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
@@ -156,6 +158,18 @@ func (c *client) AuthenticatedUser() (*CurrentUser, error) {
 	return &resp, nil
 }
 
+func (c *client) GetAppDriveInfo() error {
+	req, err := http.NewRequest(http.MethodGet, graphApiEndpoint+"/drive/special/approot", nil)
+	if err != nil {
+		return fmt.Errorf("new request: %w", err)
+	}
+	var res AppFolderInfo
+	if err := c.do(req, &res); err != nil {
+		return fmt.Errorf("executing request: %w", err)
+	}
+	return nil
+}
+
 func (c *client) addAuthHeaders(r *http.Request) error {
 	if c.creds.token == nil {
 		return errors.New("no token")
@@ -164,7 +178,7 @@ func (c *client) addAuthHeaders(r *http.Request) error {
 	return nil
 }
 
-func (c *client) do(req *http.Request, resp any) error {
+func (c *client) do(req *http.Request, resp APIResponse) error {
 	if err := c.addAuthHeaders(req); err != nil {
 		return fmt.Errorf("add auth headers: %w", err)
 	}
@@ -187,5 +201,12 @@ func (c *client) do(req *http.Request, resp any) error {
 	}
 	l.With(slog.String("body", string(b))).Debug("response body")
 
-	return json.Unmarshal(b, &resp)
+	if err := json.NewDecoder(bytes.NewReader(b)).Decode(&resp); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+
+	resp.SetRawBody(string(b))
+	resp.SetStatusCode(res.StatusCode)
+
+	return nil
 }

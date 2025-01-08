@@ -11,7 +11,7 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use: "onedrive-client",
+	Use: "onedrive",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		return setup.InitSetup(
 			configs.GetAppName(),
