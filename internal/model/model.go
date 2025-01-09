@@ -1,9 +1,14 @@
 package model
 
+import "time"
+
 type OnedriveAccount struct {
-	ID       string `gorm:"id"`
-	Name     string `gorm:"index"`
-	AuthData *TokenData
+	ID        string     `gorm:"id"`
+	Name      string     `gorm:"index"`
+	AuthData  *TokenData `gorm:"foreignKey:AccountID"`
+	Drive     *DriveInfo `gorm:"foreignKey:AccountID"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type TokenData struct {
@@ -14,4 +19,13 @@ type TokenData struct {
 	AccessToken  string
 	RefreshToken string
 	IDToken      string
+	AccountID    string
+}
+
+type DriveInfo struct {
+	ID         string `gorm:"id"`
+	DriveID    string `gorm:"index"`
+	ItemID     string `gorm:"index"`
+	RootFolder string `gorm:"index"`
+	AccountID  string
 }

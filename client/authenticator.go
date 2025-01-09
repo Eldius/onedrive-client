@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/eldius/onedrive-client/client/types"
+	"github.com/eldius/onedrive-client/internal/static"
+	"html/template"
 	"io"
 	"log/slog"
 	"math/rand"
@@ -14,6 +17,18 @@ import (
 	"strings"
 	"time"
 )
+
+var (
+	tmpl *template.Template
+)
+
+func init() {
+	var err error
+	tmpl, err = template.ParseFS(static.HandlerTemplates, "templates/**")
+	if err != nil {
+		panic(fmt.Errorf("error parsing templates: %w", err))
+	}
+}
 
 type authenticator struct {
 	c     *client
@@ -27,7 +42,7 @@ func newAuthenticator(c *client) *authenticator {
 	}
 }
 
-func (a *authenticator) authListener() (*authData, error) {
+func (a *authenticator) authListener(ctx context.Context) (*authData, error) {
 	var response *authData
 	var s *http.Server
 	mux := http.NewServeMux()
@@ -78,7 +93,7 @@ func (a *authenticator) authListener() (*authData, error) {
 	return response, nil
 }
 
-func (a *authenticator) Authenticate() (*authData, error) {
+func (a *authenticator) Authenticate(ctx context.Context) (*authData, error) {
 	u, err := url.Parse("https://login.microsoftonline.com/common/oauth2/v2.0/authorize")
 	if err != nil {
 		return nil, fmt.Errorf("authenticate: parse login.microsoftonline.com url: %w", err)
@@ -103,7 +118,7 @@ func (a *authenticator) Authenticate() (*authData, error) {
 
 	fmt.Printf("Please, authenticate here: %s\n\n\n\n", u.String())
 
-	return a.authListener()
+	return a.authListener(ctx)
 }
 
 func (a *authenticator) generateToken(d *authData) (*authData, error) {
@@ -123,7 +138,7 @@ func (a *authenticator) generateToken(d *authData) (*authData, error) {
 
 	//debugResponse(res)
 
-	var t TokenData
+	var t types.TokenData
 	if err := json.NewDecoder(res.Body).Decode(&t); err != nil {
 		slog.With("error", err).Error("generateToken")
 		return d, fmt.Errorf("generateToken: decode response body: %w", err)
@@ -149,7 +164,7 @@ type authData struct {
 	Error            string
 	ErrorDescription string
 	Raw              string
-	TokenData        *TokenData
+	TokenData        *types.TokenData
 }
 
 func (a authData) TokenAsString() string {
@@ -159,4 +174,11 @@ func (a authData) TokenAsString() string {
 
 	b, _ := json.Marshal(a.TokenData)
 	return string(b)
+}
+
+func renderAuthPage(w http.ResponseWriter, d authData) {
+	if err := tmpl.ExecuteTemplate(w, "authentication_response.html", d); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(err.Error()))
+	}
 }

@@ -1,9 +1,8 @@
 package cmd
 
 import (
-	"fmt"
-	"github.com/eldius/onedrive-client/client"
-	"github.com/eldius/onedrive-client/internal/configs"
+	"context"
+	"github.com/eldius/onedrive-client/internal/usecase"
 
 	"github.com/spf13/cobra"
 )
@@ -19,30 +18,16 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		c := client.New(
-			client.WithSecretID(configs.GetSecretID()),
-			client.WithScopes(configs.GetAuthScopes()...),
-			client.WithRedirectURL(configs.GetRedirectURL()),
-		)
-
-		auth, err := c.Authenticate()
-		if err != nil {
-			panic(err)
-		}
-
-		fmt.Printf("Auth Token: %s\n", auth.AccessToken)
-
-		user, err := c.AuthenticatedUser()
-		if err != nil {
-			panic(err)
-		}
-		fmt.Printf("user: %+v\n", user)
-
-		if err := c.GetAppDriveInfo(); err != nil {
+		ctx := context.Background()
+		if err := usecase.DriveAdd(ctx, driveName); err != nil {
 			panic(err)
 		}
 	},
 }
+
+var (
+	driveName string
+)
 
 func init() {
 	driveCmd.AddCommand(driveAddCmd)
@@ -56,4 +41,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// driveAddCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	driveAddCmd.Flags().StringVarP(&driveName, "name", "n", "", "name of the drive")
 }

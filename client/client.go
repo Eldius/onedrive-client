@@ -2,12 +2,13 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/eldius/onedrive-client/client/types"
 	"github.com/eldius/onedrive-client/internal/configs"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 )
@@ -17,9 +18,10 @@ const (
 )
 
 type Client interface {
-	Authenticate() (*TokenData, error)
-	AuthenticatedUser() (*CurrentUser, error)
-	GetAppDriveInfo() error
+	Authenticate(ctx context.Context) (*types.TokenData, error)
+	AuthenticatedUser(ctx context.Context) (*types.CurrentUser, error)
+	GetAppDriveInfo(ctx context.Context) (*types.AppFolderInfo, error)
+	CreateFolder(ctx context.Context, dirName, parentID, driveID string) (*types.CreateFile, error)
 }
 
 type client struct {
@@ -27,7 +29,7 @@ type client struct {
 	creds struct {
 		id          string
 		secret      string
-		token       *TokenData
+		token       *types.TokenData
 		scopes      []string
 		redirectURL string
 	}
@@ -84,7 +86,7 @@ func WithSecretKey(secret string) Option {
 
 // WithAuthenticationTokenData sets up the authentication token
 // (when you already authenticated to OneDrive API)
-func WithAuthenticationTokenData(token *TokenData) Option {
+func WithAuthenticationTokenData(token *types.TokenData) Option {
 	return func(c *client) {
 		if token == nil {
 			return
@@ -135,8 +137,8 @@ func New(opts ...Option) Client {
 	return c
 }
 
-func (c *client) Authenticate() (*TokenData, error) {
-	td, err := newAuthenticator(c).Authenticate()
+func (c *client) Authenticate(ctx context.Context) (*types.TokenData, error) {
+	td, err := newAuthenticator(c).Authenticate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +146,14 @@ func (c *client) Authenticate() (*TokenData, error) {
 	return td.TokenData, err
 }
 
-func (c *client) AuthenticatedUser() (*CurrentUser, error) {
+func (c *client) AuthenticatedUser(ctx context.Context) (*types.CurrentUser, error) {
 	req, err := http.NewRequest(http.MethodGet, graphApiEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
+	req = req.WithContext(ctx)
 
-	var resp CurrentUser
+	var resp types.CurrentUser
 	if err := c.do(req, &resp); err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
@@ -158,16 +161,39 @@ func (c *client) AuthenticatedUser() (*CurrentUser, error) {
 	return &resp, nil
 }
 
-func (c *client) GetAppDriveInfo() error {
+func (c *client) GetAppDriveInfo(ctx context.Context) (*types.AppFolderInfo, error) {
 	req, err := http.NewRequest(http.MethodGet, graphApiEndpoint+"/drive/special/approot", nil)
 	if err != nil {
-		return fmt.Errorf("new request: %w", err)
+		return nil, fmt.Errorf("new request: %w", err)
 	}
-	var res AppFolderInfo
+	req = req.WithContext(ctx)
+	var res types.AppFolderInfo
 	if err := c.do(req, &res); err != nil {
-		return fmt.Errorf("executing request: %w", err)
+		return nil, fmt.Errorf("executing request: %w", err)
 	}
-	return nil
+	return &res, nil
+}
+
+func (c *client) CreateFolder(ctx context.Context, dirName, parentID, driveID string) (*types.CreateFile, error) {
+	b, err := json.Marshal(map[string]interface{}{
+		"name":                              dirName,
+		"file":                              make(map[string]interface{}),
+		"@microsoft.graph.conflictBehavior": "rename",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal json: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, graphApiEndpoint+fmt.Sprintf("/drives/%s/items/%s/children", driveID, parentID), bytes.NewBuffer(b))
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	req = req.WithContext(ctx)
+	var res types.CreateFile
+	if err := c.do(req, &res); err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	return &res, nil
 }
 
 func (c *client) addAuthHeaders(r *http.Request) error {
@@ -178,10 +204,14 @@ func (c *client) addAuthHeaders(r *http.Request) error {
 	return nil
 }
 
-func (c *client) do(req *http.Request, resp APIResponse) error {
+func (c *client) do(req *http.Request, resp types.APIResponse) error {
 	if err := c.addAuthHeaders(req); err != nil {
 		return fmt.Errorf("add auth headers: %w", err)
 	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
 	res, err := c.c.Do(req)
 	if err != nil {
 		return fmt.Errorf("do request: %w", err)
@@ -190,17 +220,12 @@ func (c *client) do(req *http.Request, resp APIResponse) error {
 		_ = res.Body.Close()
 	}()
 
-	l := slog.With(
-		slog.String("url", req.URL.String()),
-		slog.String("method", req.Method),
-	)
+	debugResponse(res)
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
-	l.With(slog.String("body", string(b))).Debug("response body")
-
 	if err := json.NewDecoder(bytes.NewReader(b)).Decode(&resp); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
