@@ -19,7 +19,7 @@ type TokenData struct {
 	AccessToken  string
 	RefreshToken string
 	IDToken      string
-	AccountID    string
+	AccountID    string `gorm:"index"`
 }
 
 type DriveInfo struct {
@@ -27,5 +27,5 @@ type DriveInfo struct {
 	DriveID    string `gorm:"index"`
 	ItemID     string `gorm:"index"`
 	RootFolder string `gorm:"index"`
-	AccountID  string
+	AccountID  string `gorm:"index"`
 }

@@ -150,3 +150,29 @@ type FileSystemInfo struct {
 type Shared struct {
 	Scope string `json:"scope,omitempty"`
 }
+
+type ListFiles struct {
+	apiResponse
+	OdataContext string  `json:"@odata.context"`
+	Value        []Value `json:"value"`
+}
+type Owner struct {
+	User User `json:"user"`
+}
+type Value struct {
+	MicrosoftGraphDownloadURL string          `json:"@microsoft.graph.downloadUrl"`
+	CreatedDateTime           time.Time       `json:"createdDateTime"`
+	ETag                      string          `json:"eTag"`
+	ID                        string          `json:"id"`
+	LastModifiedDateTime      time.Time       `json:"lastModifiedDateTime"`
+	Name                      string          `json:"name"`
+	WebURL                    string          `json:"webUrl"`
+	CTag                      string          `json:"cTag"`
+	Size                      int             `json:"size"`
+	CreatedBy                 CreatedBy       `json:"createdBy"`
+	LastModifiedBy            LastModifiedBy  `json:"lastModifiedBy"`
+	ParentReference           ParentReference `json:"parentReference"`
+	File                      File            `json:"file"`
+	FileSystemInfo            FileSystemInfo  `json:"fileSystemInfo"`
+	Shared                    Shared          `json:"shared"`
+}

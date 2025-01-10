@@ -4,3 +4,6 @@ run:
 
 drive-add:
 	go run ./cmd/cli drive add -n main
+
+file-ls:
+	go run ./cmd/cli ls -a main

@@ -1,0 +1,43 @@
+package usecase
+
+import (
+	"context"
+	"fmt"
+	"github.com/eldius/onedrive-client/client"
+	"github.com/eldius/onedrive-client/client/types"
+	"github.com/eldius/onedrive-client/internal/persistence"
+)
+
+func ListFilesFromDrive(ctx context.Context, accountName string) error {
+	r := persistence.NewAuthRepository(persistence.GetDB())
+	acc, err := r.FindOneByName(ctx, accountName)
+	if err != nil {
+		return fmt.Errorf("could not find account %q: %w", accountName, err)
+	}
+
+	fmt.Printf("%+v\n", acc)
+
+	token := &types.TokenData{
+		TokenType:    acc.AuthData.TokenType,
+		Scope:        acc.AuthData.Scope,
+		ExpiresIn:    acc.AuthData.ExpiresIn,
+		ExtExpiresIn: acc.AuthData.ExtExpiresIn,
+		AccessToken:  acc.AuthData.AccessToken,
+		RefreshToken: acc.AuthData.RefreshToken,
+		IDToken:      acc.AuthData.IDToken,
+	}
+	c := client.New(
+		client.WithScopes(acc.AuthData.Scope),
+		client.WithAuthenticationTokenData(token),
+	)
+	remoteFiles, err := c.ListFiles(ctx, acc.Drive.DriveID, acc.Drive.ItemID)
+	if err != nil {
+		return fmt.Errorf("listing files: %w", err)
+	}
+
+	for _, f := range remoteFiles.Value {
+		fmt.Println(" -> file:", f.Name)
+	}
+
+	return nil
+}

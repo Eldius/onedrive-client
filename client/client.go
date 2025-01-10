@@ -22,6 +22,7 @@ type Client interface {
 	AuthenticatedUser(ctx context.Context) (*types.CurrentUser, error)
 	GetAppDriveInfo(ctx context.Context) (*types.AppFolderInfo, error)
 	CreateFolder(ctx context.Context, dirName, parentID, driveID string) (*types.CreateFile, error)
+	ListFiles(ctx context.Context, driveID, itemID string) (*types.ListFiles, error)
 }
 
 type client struct {
@@ -194,6 +195,18 @@ func (c *client) CreateFolder(ctx context.Context, dirName, parentID, driveID st
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 	return &res, nil
+}
+
+func (c *client) ListFiles(ctx context.Context, driveID, itemID string) (*types.ListFiles, error) {
+	req, err := http.NewRequest(http.MethodGet, graphApiEndpoint+fmt.Sprintf("/drives/%s/items/%s/children", driveID, itemID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	var resp types.ListFiles
+	if err := c.do(req, &resp); err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	return &resp, nil
 }
 
 func (c *client) addAuthHeaders(r *http.Request) error {
