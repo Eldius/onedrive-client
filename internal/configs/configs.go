@@ -5,23 +5,32 @@ import (
 )
 
 var (
-	DefaultAuthScopes   = []string{"profile", "email", "openid", "offline_access", "User.Read", "Files.ReadWrite.AppFolder"}
-	DefaultRedirectURL  = "http://localhost:9999/authentication"
-	DefaultBaseEndpoint = "https://graph.microsoft.com/v1.0"
+	DefaultAuthScopes  = []string{"profile", "email", "openid", "offline_access", "User.Read", "Files.ReadWrite.AppFolder"}
+	DefaultRedirectURL = "http://localhost:9999/authentication"
+	AppName            = "onedrive-client"
+
+	DBFileKey          = "db.filepath"
+	AuthSecretIDKey    = "auth.secret_id"
+	AuthRedirectURLKey = "auth.redirect_url"
+	AuthScopesKey      = "auth.scopes"
 )
 
 func GetSecretID() string {
-	return viper.GetString("auth.secret_id")
+	return viper.GetString(AuthSecretIDKey)
 }
 
 func GetRedirectURL() string {
-	return viper.GetString("auth.redirect_url")
+	return viper.GetString(AuthRedirectURLKey)
 }
 
 func GetAuthScopes() []string {
-	return viper.GetStringSlice("auth.scopes")
+	return viper.GetStringSlice(AuthScopesKey)
 }
 
 func GetAppName() string {
-	return "onedrive-client"
+	return AppName
+}
+
+func GetDBFilePath() string {
+	return viper.GetString(DBFileKey)
 }

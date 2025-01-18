@@ -7,3 +7,9 @@ drive-add:
 
 file-ls:
 	go run ./cmd/cli ls -a main
+
+upload:
+	go run ./cmd/cli upload -a main -i ./README.md -o /dev/tmp_files/README.md
+
+generate:
+	wire ./...

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	cfg "github.com/eldius/initial-config-go/configs"
 	"github.com/eldius/initial-config-go/setup"
@@ -16,6 +17,7 @@ func init() {
 func main() {
 	configFile := pflag.String("config", "", "config file path")
 
+	ctx := context.Background()
 	if err := setup.InitSetup(
 		configs.GetAppName(),
 		setup.WithConfigFileToBeUsed(*configFile),
@@ -37,7 +39,7 @@ func main() {
 		client.WithRedirectURL(configs.GetRedirectURL()),
 	)
 
-	token, err := c.Authenticate()
+	token, err := c.Authenticate(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +47,7 @@ func main() {
 	fmt.Println("token:", token)
 	slog.With("token", token).Info("token received")
 
-	u, err := c.AuthenticatedUser()
+	u, err := c.AuthenticatedUser(ctx)
 	if err != nil {
 		panic(err)
 	}

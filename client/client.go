@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -21,8 +22,29 @@ type Client interface {
 	Authenticate(ctx context.Context) (*types.TokenData, error)
 	AuthenticatedUser(ctx context.Context) (*types.CurrentUser, error)
 	GetAppDriveInfo(ctx context.Context) (*types.AppFolderInfo, error)
-	CreateFolder(ctx context.Context, dirName, parentID, driveID string) (*types.CreateFile, error)
 	ListFiles(ctx context.Context, driveID, itemID string) (*types.ListFiles, error)
+
+	CreateFolder(
+		ctx context.Context,
+		dirName,
+		parentID,
+		driveID string,
+	) (*types.CreateFile, error)
+
+	UploadFile(
+		ctx context.Context,
+		dirName,
+		parentID,
+		driveID string,
+	) (*types.CreateFile, error)
+
+	CreateUploadSession(
+		ctx context.Context,
+		driveID,
+		itemID,
+		inputFile,
+		outputFile string,
+	) (*types.ListFiles, error)
 }
 
 type client struct {
@@ -153,9 +175,11 @@ func (c *client) AuthenticatedUser(ctx context.Context) (*types.CurrentUser, err
 		return nil, fmt.Errorf("new request: %w", err)
 	}
 	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	var resp types.CurrentUser
-	if err := c.do(req, &resp); err != nil {
+	if err := c.doWithRefreshTokenIfUnauthorized(ctx, req, &resp, true, true); err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 
@@ -168,18 +192,21 @@ func (c *client) GetAppDriveInfo(ctx context.Context) (*types.AppFolderInfo, err
 		return nil, fmt.Errorf("new request: %w", err)
 	}
 	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
 	var res types.AppFolderInfo
-	if err := c.do(req, &res); err != nil {
+	if err := c.doWithRefreshTokenIfUnauthorized(ctx, req, &res, true, true); err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 	return &res, nil
 }
 
 func (c *client) CreateFolder(ctx context.Context, dirName, parentID, driveID string) (*types.CreateFile, error) {
-	b, err := json.Marshal(map[string]interface{}{
-		"name":                              dirName,
-		"file":                              make(map[string]interface{}),
-		"@microsoft.graph.conflictBehavior": "rename",
+	b, err := json.Marshal(folderPayload{
+		Name:              dirName,
+		Folder:            folder{},
+		ConflictBehaviour: "rename",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal json: %w", err)
@@ -190,8 +217,11 @@ func (c *client) CreateFolder(ctx context.Context, dirName, parentID, driveID st
 		return nil, fmt.Errorf("new request: %w", err)
 	}
 	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
 	var res types.CreateFile
-	if err := c.do(req, &res); err != nil {
+	if err := c.doWithRefreshTokenIfUnauthorized(ctx, req, &res, true, true); err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 	return &res, nil
@@ -202,8 +232,44 @@ func (c *client) ListFiles(ctx context.Context, driveID, itemID string) (*types.
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
+
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
 	var resp types.ListFiles
-	if err := c.do(req, &resp); err != nil {
+	if err := c.doWithRefreshTokenIfUnauthorized(ctx, req, &resp, true, true); err != nil {
+		return nil, fmt.Errorf("executing request: %w", err)
+	}
+	return &resp, nil
+}
+
+func (c *client) CreateUploadSession(ctx context.Context, driveID, itemID, inputFile, outputFile string) (*types.ListFiles, error) {
+	b, err := json.Marshal(createUploadSession{
+		MicrosoftGraphConflictBehavior: "rename",
+		Description:                    "",
+		FileSystemInfo:                 createUploadSessionFileSystemInfo{},
+		Name:                           outputFile,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal json: %w", err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		graphApiEndpoint+fmt.Sprintf("/drives/%s/items/%s/createUploadSession", driveID, itemID),
+		bytes.NewBuffer(b),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	var resp types.ListFiles
+	if err := c.doWithRefreshTokenIfUnauthorized(ctx, req, &resp, true, true); err != nil {
 		return nil, fmt.Errorf("executing request: %w", err)
 	}
 	return &resp, nil
@@ -217,13 +283,27 @@ func (c *client) addAuthHeaders(r *http.Request) error {
 	return nil
 }
 
-func (c *client) do(req *http.Request, resp types.APIResponse) error {
-	if err := c.addAuthHeaders(req); err != nil {
-		return fmt.Errorf("add auth headers: %w", err)
+func (c *client) do(ctx context.Context, req *http.Request, resp types.APIResponse, authenticated bool) error {
+	return c.doWithRefreshTokenIfUnauthorized(ctx, req, resp, authenticated, false)
+}
+
+func (c *client) doWithRefreshTokenIfUnauthorized(ctx context.Context, req *http.Request, resp types.APIResponse, authenticated, refresh bool) error {
+	reqB := make([]byte, 0)
+	if req.Body != nil {
+		var err error
+		reqB, err = io.ReadAll(req.Body)
+		if err != nil {
+			return fmt.Errorf("read body: %w", err)
+		}
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	req.Body = io.NopCloser(bytes.NewBuffer(reqB))
+
+	if authenticated {
+		if err := c.addAuthHeaders(req); err != nil {
+			return fmt.Errorf("add auth headers: %w", err)
+		}
+	}
 
 	res, err := c.c.Do(req)
 	if err != nil {
@@ -233,7 +313,7 @@ func (c *client) do(req *http.Request, resp types.APIResponse) error {
 		_ = res.Body.Close()
 	}()
 
-	debugResponse(res)
+	debugResponse(ctx, res, reqB)
 
 	b, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -246,5 +326,58 @@ func (c *client) do(req *http.Request, resp types.APIResponse) error {
 	resp.SetRawBody(string(b))
 	resp.SetStatusCode(res.StatusCode)
 
+	if res.StatusCode == http.StatusUnauthorized && refresh {
+		if err := c.refreshToken(ctx); err != nil {
+			return fmt.Errorf("refresh token: %w", err)
+		}
+		return c.doWithRefreshTokenIfUnauthorized(ctx, req, resp, authenticated, false)
+	}
+	if res.StatusCode/100 != 2 {
+		return fmt.Errorf("unexpected status code: %d (%d)", res.StatusCode, res.StatusCode/100)
+	}
+
 	return nil
+}
+
+func (c *client) refreshToken(ctx context.Context) error {
+	v := url.Values{}
+	v.Set("client_id", configs.GetSecretID())
+	v.Set("scope", strings.Join(c.getScopes(), " "))
+	v.Set("refresh_token", c.creds.token.RefreshToken)
+	v.Set("redirect_uri", c.getRedirectURL())
+	v.Set("grant_type", "refresh_token")
+	req, err := http.NewRequest(http.MethodPost, tokenEndpoint, strings.NewReader(v.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	if err != nil {
+		return fmt.Errorf("new request: %w", err)
+	}
+	if err := c.do(ctx, req, c.creds.token, false); err != nil {
+		return fmt.Errorf("executing request: %w", err)
+	}
+	return nil
+}
+
+func (c *client) UploadFile(ctx context.Context, dirName, parentID, driveID string) (*types.CreateFile, error) {
+	return nil, nil
+}
+
+type folderPayload struct {
+	Name              string `json:"name"`
+	Folder            folder `json:"folder"`
+	ConflictBehaviour string `json:"@microsoft.graph.conflictBehavior"`
+}
+
+type folder struct{}
+
+type createUploadSession struct {
+	MicrosoftGraphConflictBehavior string                            `json:"@microsoft.graph.conflictBehavior"`
+	Description                    string                            `json:"description"`
+	FileSystemInfo                 createUploadSessionFileSystemInfo `json:"fileSystemInfo"`
+	Name                           string                            `json:"name"`
+}
+
+type createUploadSessionFileSystemInfo struct {
+	OdataType string `json:"@odata.type"`
 }

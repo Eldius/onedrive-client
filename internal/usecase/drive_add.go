@@ -4,39 +4,42 @@ import (
 	"context"
 	"fmt"
 	"github.com/eldius/onedrive-client/client"
-	"github.com/eldius/onedrive-client/internal/configs"
 	"github.com/eldius/onedrive-client/internal/model"
 	"github.com/eldius/onedrive-client/internal/persistence"
 	"os"
 )
 
-// DriveAdd adds a new drive configuration
-func DriveAdd(ctx context.Context, name string) error {
-	c := client.New(
-		client.WithSecretID(configs.GetSecretID()),
-		client.WithScopes(configs.GetAuthScopes()...),
-		client.WithRedirectURL(configs.GetRedirectURL()),
-	)
+type DriveAddUseUseCase struct {
+	c client.Client
+	r *persistence.AuthRepository
+}
 
-	auth, err := c.Authenticate(ctx)
+func newDriveAddUseCase(c client.Client, r *persistence.AuthRepository) *DriveAddUseUseCase {
+	return &DriveAddUseUseCase{
+		c: c,
+		r: r,
+	}
+}
+
+// DriveAdd adds a new drive configuration
+func (u *DriveAddUseUseCase) DriveAdd(ctx context.Context, name string) error {
+	auth, err := u.c.Authenticate(ctx)
 	if err != nil {
 		return fmt.Errorf("DriveAdd: authenticate: %w", err)
 	}
 
 	fmt.Printf("Auth Token: %s\n", auth.AccessToken)
 
-	user, err := c.AuthenticatedUser(ctx)
+	user, err := u.c.AuthenticatedUser(ctx)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("user: %+v\n", user)
 
-	appDrive, err := c.GetAppDriveInfo(ctx)
+	appDrive, err := u.c.GetAppDriveInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("DriveAdd: get app drive info: %w", err)
 	}
-
-	r := persistence.NewAuthRepository(persistence.GetDB())
 
 	account := &model.OnedriveAccount{
 		Name: name,
@@ -56,12 +59,12 @@ func DriveAdd(ctx context.Context, name string) error {
 	}
 
 	hostname, _ := os.Hostname()
-	rootFolder, err := c.CreateFolder(ctx, hostname, account.Drive.ItemID, account.Drive.DriveID)
+	rootFolder, err := u.c.CreateFolder(ctx, hostname, account.Drive.ItemID, account.Drive.DriveID)
 	if err != nil {
 		return fmt.Errorf("DriveAdd: create folder: %w", err)
 	}
 
 	account.Drive.RootFolder = rootFolder.Name
 
-	return r.Persist(ctx, account)
+	return u.r.Persist(ctx, account)
 }

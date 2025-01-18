@@ -22,6 +22,10 @@ var (
 	tmpl *template.Template
 )
 
+const (
+	tokenEndpoint = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+)
+
 func init() {
 	var err error
 	tmpl, err = template.ParseFS(static.HandlerTemplates, "templates/**")
@@ -128,7 +132,7 @@ func (a *authenticator) generateToken(d *authData) (*authData, error) {
 	v.Set("code", d.Code)
 	v.Set("redirect_uri", a.c.getRedirectURL())
 	v.Set("grant_type", "authorization_code")
-	res, err := http.PostForm("https://login.microsoftonline.com/common/oauth2/v2.0/token", v)
+	res, err := http.PostForm(tokenEndpoint, v)
 	if err != nil {
 		return d, fmt.Errorf("generateToken: create request: %w", err)
 	}
@@ -151,10 +155,27 @@ func (a *authenticator) generateToken(d *authData) (*authData, error) {
 	return d, nil
 }
 
-func debugResponse(res *http.Response) {
+func debugResponse(ctx context.Context, res *http.Response, reqBody []byte) {
 	b, _ := io.ReadAll(res.Body)
-	slog.With("status_code", res.StatusCode, "response_body", string(b)).Debug("generateToken")
+	slog.With("request", map[string]any{
+		"status_code": res.StatusCode,
+		"body":        string(reqBody),
+		"headers":     headerToMap(res.Request.Header),
+		"method":      res.Request.Method,
+		"response": map[string]any{
+			"body":    string(b),
+			"headers": headerToMap(res.Header),
+		},
+	}).DebugContext(ctx, "generateToken")
 	res.Body = io.NopCloser(bytes.NewReader(b))
+}
+
+func headerToMap(h http.Header) map[string]any {
+	m := make(map[string]any)
+	for k, v := range h {
+		m[k] = v
+	}
+	return m
 }
 
 type authData struct {

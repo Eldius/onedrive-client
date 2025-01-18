@@ -8,14 +8,22 @@ import (
 	"github.com/eldius/onedrive-client/internal/persistence"
 )
 
-func ListFilesFromDrive(ctx context.Context, accountName string) error {
-	r := persistence.NewAuthRepository(persistence.GetDB())
-	acc, err := r.FindOneByName(ctx, accountName)
+type ListFilesUseCase struct {
+	c client.Client
+	r *persistence.AuthRepository
+}
+
+func newListFilesUseCase(r *persistence.AuthRepository) *ListFilesUseCase {
+	return &ListFilesUseCase{
+		r: r,
+	}
+}
+
+func (l *ListFilesUseCase) ListFilesFromDrive(ctx context.Context, accountName string) error {
+	acc, err := loadSession(ctx, l.r, accountName)
 	if err != nil {
 		return fmt.Errorf("could not find account %q: %w", accountName, err)
 	}
-
-	fmt.Printf("%+v\n", acc)
 
 	token := &types.TokenData{
 		TokenType:    acc.AuthData.TokenType,
@@ -36,7 +44,7 @@ func ListFilesFromDrive(ctx context.Context, accountName string) error {
 	}
 
 	for _, f := range remoteFiles.Value {
-		fmt.Println(" -> file:", f.Name)
+		fmt.Printf(" -> file: %s (%s)\n", f.Name, f.File.MimeType)
 	}
 
 	return nil
