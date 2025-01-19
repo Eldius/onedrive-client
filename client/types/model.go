@@ -176,3 +176,10 @@ type Value struct {
 	FileSystemInfo            FileSystemInfo  `json:"fileSystemInfo"`
 	Shared                    Shared          `json:"shared"`
 }
+
+func (v Value) GetMimeType() string {
+	if v.File.MimeType == "" {
+		return "directory"
+	}
+	return v.File.MimeType
+}

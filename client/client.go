@@ -347,12 +347,12 @@ func (c *client) refreshToken(ctx context.Context) error {
 	v.Set("redirect_uri", c.getRedirectURL())
 	v.Set("grant_type", "refresh_token")
 	req, err := http.NewRequest(http.MethodPost, tokenEndpoint, strings.NewReader(v.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-
 	if err != nil {
 		return fmt.Errorf("new request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
 	if err := c.do(ctx, req, c.creds.token, false); err != nil {
 		return fmt.Errorf("executing request: %w", err)
 	}

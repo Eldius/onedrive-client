@@ -44,7 +44,7 @@ func (l *ListFilesUseCase) ListFilesFromDrive(ctx context.Context, accountName s
 	}
 
 	for _, f := range remoteFiles.Value {
-		fmt.Printf(" -> file: %s (%s)\n", f.Name, f.File.MimeType)
+		fmt.Printf(" -> file: %s (%s)\n", f.Name, f.GetMimeType())
 	}
 
 	return nil

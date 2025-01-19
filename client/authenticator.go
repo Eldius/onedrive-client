@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -153,29 +152,6 @@ func (a *authenticator) generateToken(d *authData) (*authData, error) {
 	slog.With("token", d.TokenData, "status_code", res.StatusCode).Debug("generateToken")
 
 	return d, nil
-}
-
-func debugResponse(ctx context.Context, res *http.Response, reqBody []byte) {
-	b, _ := io.ReadAll(res.Body)
-	slog.With("request", map[string]any{
-		"status_code": res.StatusCode,
-		"body":        string(reqBody),
-		"headers":     headerToMap(res.Request.Header),
-		"method":      res.Request.Method,
-		"response": map[string]any{
-			"body":    string(b),
-			"headers": headerToMap(res.Header),
-		},
-	}).DebugContext(ctx, "generateToken")
-	res.Body = io.NopCloser(bytes.NewReader(b))
-}
-
-func headerToMap(h http.Header) map[string]any {
-	m := make(map[string]any)
-	for k, v := range h {
-		m[k] = v
-	}
-	return m
 }
 
 type authData struct {
