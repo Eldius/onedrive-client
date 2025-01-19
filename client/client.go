@@ -59,7 +59,7 @@ type client struct {
 }
 
 func (c *client) getScopes() []string {
-	if c.creds.scopes == nil || len(c.creds.scopes) == 0 {
+	if len(c.creds.scopes) == 0 {
 		return configs.DefaultAuthScopes
 	}
 	return c.creds.scopes
@@ -131,7 +131,7 @@ func WithHttpClient(hc *http.Client) Option {
 // for authentication
 func WithScopes(scopes ...string) Option {
 	return func(c *client) {
-		if scopes == nil || len(scopes) == 0 {
+		if len(scopes) == 0 {
 			return
 		}
 		c.creds.scopes = scopes

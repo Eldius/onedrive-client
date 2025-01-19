@@ -9,7 +9,6 @@ import (
 )
 
 type ListFilesUseCase struct {
-	c client.Client
 	r *persistence.AuthRepository
 }
 
