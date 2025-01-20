@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/eldius/onedrive-client/internal/configs"
 	"io"
 	"log/slog"
 	"maps"
@@ -42,23 +43,10 @@ func parseBody(b []byte) []byte {
 	return body
 }
 
-var (
-	redactedKeyList = []string{
-		"access_token",
-		"accesstoken",
-		"refresh_token",
-		"refreshtoken",
-		"token_type",
-		"idtoken",
-		"authorization",
-		"athentication",
-	}
-)
-
 func parseMap(v map[string]any) map[string]any {
 	v = maps.Clone(v)
 	for k := range maps.Keys(v) {
-		if slices.Contains(redactedKeyList, strings.ToLower(k)) {
+		if slices.Contains(configs.RedactedKeyList, strings.ToLower(k)) {
 			if reflect.TypeOf(v[k]).Kind() == reflect.Map {
 				v[k] = parseMap(v[k].(map[string]any))
 			}

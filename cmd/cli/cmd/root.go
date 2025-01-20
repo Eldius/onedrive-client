@@ -21,6 +21,7 @@ var rootCmd = &cobra.Command{
 				cfg.LogLevelKey:            cfg.LogLevelDEBUG,
 				cfg.LogOutputFileKey:       "execution.log",
 				cfg.LogOutputToStdoutKey:   false,
+				cfg.LogKeysToRedactKey:     configs.RedactedKeyList,
 				configs.AuthRedirectURLKey: configs.DefaultRedirectURL,
 				configs.AuthScopesKey:      configs.DefaultAuthScopes,
 				configs.DBFileKey:          ".db",

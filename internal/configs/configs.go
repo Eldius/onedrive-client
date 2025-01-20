@@ -15,6 +15,19 @@ var (
 	AuthScopesKey      = "auth.scopes"
 )
 
+var (
+	RedactedKeyList = []string{
+		"access_token",
+		"accesstoken",
+		"refresh_token",
+		"refreshtoken",
+		"token_type",
+		"idtoken",
+		"authorization",
+		"athentication",
+	}
+)
+
 func GetSecretID() string {
 	return viper.GetString(AuthSecretIDKey)
 }
